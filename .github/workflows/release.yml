@@ -1,29 +1,38 @@
-name: Release pipeline
-
-on:
-  workflow_dispatch:
-  push:
-    tags:
-      - "v*"
-
 jobs:
   release:
-    name: Publish release to CDN
+    name: Make a Zip File
     runs-on: ubuntu-22.04
-    env:
-      DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
     steps:
       - name: Clone project
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Workaround checkout issues
         run: |
           git fetch --tags --force
+
       - name: Create Package
         uses: BigWigsMods/packager@v2
         with:
           args: -n "{package-name}-{project-version}"
+
       - name: Get package name
+        id: get_package
         run: |
-          echo "PACKAGE=$(find .release -type f -name *.zip -printf "%f\n")" >> $GITHUB_ENV
+          PACKAGE=$(find .release -type f -name '*.zip' -printf '%f\n' | head -n 1)
+          echo "PACKAGE=$PACKAGE" >> $GITHUB_ENV
+          echo "package=$PACKAGE" >> $GITHUB_OUTPUT
+
+      - name: Upload zip as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PACKAGE }}
+          path: .release/${{ env.PACKAGE }}
+
+      - name: Create GitHub Release with asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .release/${{ env.PACKAGE }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
