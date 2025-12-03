@@ -1,3 +1,11 @@
+name: Release pipeline
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
 jobs:
   release:
     name: Make a Zip File
@@ -29,10 +37,3 @@ jobs:
         with:
           name: ${{ env.PACKAGE }}
           path: .release/${{ env.PACKAGE }}
-
-      - name: Create GitHub Release with asset
-        uses: softprops/action-gh-release@v2
-        with:
-          files: .release/${{ env.PACKAGE }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
