@@ -21,9 +21,7 @@ externals:
   ElvUI_Libraries/Core/LibTranslit-1.0: https://github.com/Vardex/LibTranslit
   ElvUI_Libraries/Core/LibDualSpec-1.0: https://repos.curseforge.com/wow/libdualspec-1-0
   ElvUI_Libraries/Core/UTF8: https://repos.curseforge.com/wow/utf8/trunk
-  ElvUI_Libraries/Core/LibDispel:
-    url: https://github.com/tukui-org/LibDispel
-    branch: alpha
+  ElvUI_Libraries/Core/LibDispel: https://github.com/tukui-org/LibDispel
   ElvUI_Libraries/Core/TaintLess:
     url: https://www.townlong-yak.com/addons.git/taintless
     commit: default
