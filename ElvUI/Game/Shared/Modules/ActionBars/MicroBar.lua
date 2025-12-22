@@ -196,7 +196,7 @@ function AB:HandleMicroTextures(button, name)
 			if stock and stock.disabled then
 				disabled:SetTexture(stock.disabled)
 			else
-				disabled:SetTexture(texture)
+				disabled:SetTexture(texture or nil)
 			end
 
 			disabled:SetDesaturated(true)
@@ -442,7 +442,7 @@ function AB:SetupMicroBar()
 		local button = _G[name]
 		AB:HandleMicroButton(button, name)
 
-		if E.Retail or name == 'MainMenuMicroButton' then
+		if E.Retail or (name == 'MainMenuMicroButton' or name == 'GuildMicroButton') then
 			hooksecurefunc(button, (E.Retail and 'SetHighlightAtlas') or (E.Classic and 'SetPushedTexture') or 'SetHighlightTexture', function()
 				AB:UpdateMicroButtonTexture(name)
 			end)

@@ -2174,7 +2174,7 @@ function CH:MessageFormatter(frame, info, chatType, chatGroup, chatTarget, chann
 	elseif chatType == 'TEXT_EMOTE' then
 		body = ((not issecretvalue or not issecretvalue(arg2)) and arg2 ~= senderLink) and gsub(message, arg2, senderLink, 1) or message
 	else
-		body = format(_G['CHAT_'..chatType..'_GET'] .. '%s', pflag..senderLink, message)
+		body = format(_G['CHAT_'..chatType..'_GET']..message, pflag..senderLink)
 	end
 
 	-- Add Channel
@@ -2385,10 +2385,10 @@ function CH:ChatFrame_MessageEventHandler(frame, event, arg1, arg2, arg3, arg4, 
 
 			if E.Retail and arg1 == 'YOU_CHANGED' and GetChannelRuleset(arg8) == CHATCHANNELRULESET_MENTOR then
 				_G.ChatFrame_UpdateDefaultChatTarget(frame)
-				_G.ChatEdit_UpdateNewcomerEditBoxHint(frame.editBox)
+				frame.editBox:UpdateNewcomerEditBoxHint()
 			else
 				if E.Retail and arg1 == 'YOU_LEFT' then
-					_G.ChatEdit_UpdateNewcomerEditBoxHint(frame.editBox, arg8)
+					frame.editBox:UpdateNewcomerEditBoxHint(arg8)
 				end
 
 				local globalstring
@@ -3984,9 +3984,16 @@ function CH:Initialize()
 	CH:UpdateEditboxAnchors()
 	CH:HandleChatVoiceIcons()
 
-	CH:SecureHook('ChatEdit_ActivateChat')
-	CH:SecureHook('ChatEdit_DeactivateChat')
-	CH:SecureHook('ChatEdit_SetLastActiveWindow')
+	if _G.ChatFrameUtil and _G.ChatFrameUtil.ActivateChat then
+		CH:SecureHook(_G.ChatFrameUtil, 'ActivateChat', 'ChatEdit_ActivateChat')
+		CH:SecureHook(_G.ChatFrameUtil, 'DeactivateChat', 'ChatEdit_DeactivateChat')
+		CH:SecureHook(_G.ChatFrameUtil, 'SetLastActiveWindow', 'ChatEdit_SetLastActiveWindow')
+	else
+		CH:SecureHook('ChatEdit_ActivateChat')
+		CH:SecureHook('ChatEdit_DeactivateChat')
+		CH:SecureHook('ChatEdit_SetLastActiveWindow')
+	end
+
 	CH:SecureHook('FCFTab_UpdateColors')
 	CH:SecureHook('FCFDock_SelectWindow')
 	CH:SecureHook('FCFDock_ScrollToSelectedTab')

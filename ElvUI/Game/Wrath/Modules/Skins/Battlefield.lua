@@ -8,10 +8,8 @@ function S:SkinBattlefield()
 
 	S:HandleFrame(_G.BattlefieldFrame, true, nil, 11, -12, -32, 76)
 
-	_G.BattlefieldListScrollFrame:StripTextures()
-	S:HandleScrollBar(_G.BattlefieldListScrollFrameScrollBar)
-
-	_G.BattlefieldFrameZoneDescription:SetTextColor(1, 1, 1)
+	_G.BattlefieldFrameTypeScrollFrame:StripTextures()
+	S:HandleScrollBar(_G.BattlefieldFrameTypeScrollFrameScrollBar)
 
 	S:HandleButton(_G.BattlefieldFrameCancelButton)
 	S:HandleButton(_G.BattlefieldFrameJoinButton)

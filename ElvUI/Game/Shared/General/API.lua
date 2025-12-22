@@ -7,6 +7,7 @@ local ElvUF = E.oUF
 
 local _G = _G
 local setmetatable = setmetatable
+local issecrettable = issecrettable
 local hooksecurefunc = hooksecurefunc
 local type, pairs, unpack, strmatch = type, pairs, unpack, strmatch
 local wipe, max, next, tinsert, date, time = wipe, max, next, tinsert, date, time
@@ -53,7 +54,6 @@ local GetWatchedFactionData = C_Reputation.GetWatchedFactionData
 
 local GetColorDataForItemQuality = ColorManager and ColorManager.GetColorDataForItemQuality
 local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
-local UnpackAuraData = AuraUtil.UnpackAuraData
 
 local GetSpecialization = C_SpecializationInfo.GetSpecialization or GetSpecialization
 local GetSpecializationInfo = C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo
@@ -517,8 +517,20 @@ do -- Spell renaming provided by BigWigs
 end
 
 do
+	function E:UnpackAuraData(data)
+		local name, icon, applications, dispelName, duration, expirationTime, sourceUnit, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossAura, isFromPlayerOrPlayerPet, nameplateShowAll, timeMod = data.name, data.icon, data.applications, data.dispelName, data.duration, data.expirationTime, data.sourceUnit, data.isStealable, data.nameplateShowPersonal, data.spellId, data.canApplyAura, data.isBossAura, data.isFromPlayerOrPlayerPet, data.nameplateShowAll, data.timeMod
+		if issecrettable and issecrettable(data.points) then
+			return name, icon, applications, dispelName, duration, expirationTime, sourceUnit, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossAura, isFromPlayerOrPlayerPet, nameplateShowAll, timeMod
+		else
+			return name, icon, applications, dispelName, duration, expirationTime, sourceUnit, isStealable, nameplateShowPersonal, spellId, canApplyAura, isBossAura, isFromPlayerOrPlayerPet, nameplateShowAll, timeMod, unpack(data.points)
+		end
+	end
+
 	function E:GetAuraData(unitToken, index, filter)
-		return UnpackAuraData(GetAuraDataByIndex(unitToken, index, filter))
+		local data = GetAuraDataByIndex(unitToken, index, filter)
+		if not data then return end
+
+		return E:UnpackAuraData(data)
 	end
 
 	local function FindAura(key, value, unit, index, filter, ...)
@@ -1036,7 +1048,7 @@ function E:PositionGameMenuButton()
 
 			local lastIndex = gameMenuLastButtons[text]
 			if lastIndex == gameMenuLastButtons.ElvUI and GameMenuFrame.ElvUI then
-				GameMenuFrame.ElvUI:Point('TOPLEFT', button, 'BOTTOMLEFT', 0, -10)
+				GameMenuFrame.ElvUI:Point('TOPLEFT', button, 'BOTTOMLEFT', 0, E.TBC and -30 or -10)
 			elseif not lastIndex then
 				button:NudgePoint(nil, -offset)
 			end
