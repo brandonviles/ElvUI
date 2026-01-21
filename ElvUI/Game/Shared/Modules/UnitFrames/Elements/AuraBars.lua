@@ -6,6 +6,8 @@ local ipairs = ipairs
 local strfind = strfind
 
 local CreateFrame = CreateFrame
+local WrapString = C_StringUtil and C_StringUtil.WrapString
+local GetAuraApplicationDisplayCount = C_UnitAuras.GetAuraApplicationDisplayCount
 
 local DebuffColors = E.Libs.Dispel:GetDebuffTypeColor()
 
@@ -27,6 +29,12 @@ function UF:Construct_AuraBars(bar)
 	UF.statusbars[bar] = 'aurabars'
 	UF:Update_StatusBar(bar)
 
+	E:RegisterCooldown(bar.cooldown, 'unitframe')
+
+	bar.cooldown:SetEdgeTexture(E.Media.Textures.Invisible)
+	bar.cooldown.Text:SetPoint('RIGHT', bar, 'RIGHT', -2, 0)
+
+	UF:Configure_FontString(bar.cooldown.Text)
 	UF:Configure_FontString(bar.timeText)
 	UF:Configure_FontString(bar.nameText)
 
@@ -45,7 +53,7 @@ function UF:AuraBars_UpdateBar(bar)
 	local bars = bar:GetParent()
 	bar.db = bars.db
 
-	if bars.db then
+	if bars.db and not E.Midnight then
 		E:SetSmoothing(bar, bars.db.smoothbars)
 	end
 
@@ -55,6 +63,7 @@ function UF:AuraBars_UpdateBar(bar)
 	bar.spark:Point('BOTTOM')
 	bar.spark:Point('TOP')
 
+	UF:Update_FontString(bar.cooldown.Text)
 	UF:Update_FontString(bar.timeText)
 	UF:Update_FontString(bar.nameText)
 end
@@ -212,11 +221,20 @@ function UF:PostUpdateBar_AuraBars(_, bar, _, _, _, _, debuffType) -- unit, bar,
 		end
 	end
 
-	local text = (self.db and self.db.abbrevName and spellName and E.TagFunctions.Abbrev(spellName)) or spellName
-	if E:NotSecretValue(bar.count) and (bar.count > 1) then
-		bar.nameText:SetFormattedText('[%d] %s', bar.count, text)
-	else
-		bar.nameText:SetText(text)
+	local text = self.db and self.db.abbrevName and spellName and E.TagFunctions.Abbrev(spellName)
+	if text then -- this is a copy from oUF we just change the text
+		if E:IsSecretValue(bar.count) then
+			if bar.aura then
+				local minCount, maxCount = 2, 999
+				bar.nameText:SetFormattedText('%s%s', WrapString(GetAuraApplicationDisplayCount(bar.unit, bar.aura.auraInstanceID, minCount, maxCount), '[', '] '), text)
+			else
+				bar.nameText:SetText(text)
+			end
+		elseif bar.count > 1 then
+			bar.nameText:SetFormattedText('[%d] %s', bar.count, text)
+		else
+			bar.nameText:SetText(text)
+		end
 	end
 
 	if bar.bg then
