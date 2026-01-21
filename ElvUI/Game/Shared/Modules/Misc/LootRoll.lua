@@ -1,12 +1,14 @@
 local E, L, V, P, G = unpack(ElvUI)
 local M = E:GetModule('Misc')
 local B = E:GetModule('Bags')
+local BL = E:GetModule('Blizzard')
 
 local LSM = E.Libs.LSM
 
 local _G = _G
 local unpack, next, wipe = unpack, next, wipe
 local tinsert, tremove, format = tinsert, tremove, format
+local hooksecurefunc = hooksecurefunc
 
 local CreateFrame = CreateFrame
 local GameTooltip = GameTooltip
@@ -460,8 +462,8 @@ end
 
 function M:UpdateLootRollFrames()
 	if not E.private.general.lootRoll then return end
-	local db = E.db.general.lootRoll
 
+	local db = E.db.general.lootRoll
 	local font = LSM:Fetch('font', db.nameFont)
 	local texture = LSM:Fetch('statusbar', db.statusBarTexture)
 	local maxBars = E.Retail and db.maxBars or _G.NUM_GROUP_LOOT_FRAMES or 4
@@ -527,6 +529,47 @@ function M:UpdateLootRollFrames()
 			bar.name:Point('RIGHT', bar.bind, 'LEFT', -1, 0)
 			bar.bind:Point('RIGHT', bar.need, 'LEFT', -1, 0)
 		end
+	end
+end
+
+function M:PositionGroupLootContainer() -- used by PostAlertMove and AlertFrame post hooks GroupLootContainer_Update
+	local _, anchor, position, point, xOffset, yOffset = BL:GetAlertAnchors()
+
+	_G.GroupLootContainer:ClearAllPoints()
+	_G.GroupLootContainer:Point(position, anchor, point, xOffset, yOffset)
+
+	if not E.private.general.lootRoll then return end
+
+	if _G.GroupLootContainer:IsShown() then
+		M.UpdateGroupLootContainer(_G.GroupLootContainer)
+	end
+end
+
+function M:UpdateGroupLootContainer()
+	local _, _, position, point, xOffset, yOffset = BL:GetAlertAnchors()
+	local lastIdx
+
+	for i = 1, self.maxIndex do
+		local frame = self.rollFrames[i]
+		if frame then
+			frame:ClearAllPoints()
+
+			local prevFrame = self.rollFrames[i-1]
+			if prevFrame and prevFrame ~= frame then
+				frame:Point(position, prevFrame, point, xOffset, yOffset)
+			else
+				frame:Point(position, self, position, xOffset, yOffset)
+			end
+
+			lastIdx = i
+		end
+	end
+
+	if lastIdx then
+		self:Height(self.reservedSize * lastIdx)
+		self:Show()
+	else
+		self:Hide()
 	end
 end
 

@@ -36,24 +36,26 @@ local IsXPUserDisabled = IsXPUserDisabled
 local RequestBattlefieldScoreData = RequestBattlefieldScoreData
 local UIParent = UIParent
 local UIParentLoadAddOn = UIParentLoadAddOn
+local UnitClassBase = UnitClassBase
+local UnitClassification = UnitClassification
 local UnitExists = UnitExists
 local UnitFactionGroup = UnitFactionGroup
 local UnitGroupRolesAssigned = UnitGroupRolesAssigned
 local UnitGUID = UnitGUID
-local UnitThreatSituation = UnitThreatSituation
 local UnitHasVehicleUI = UnitHasVehicleUI
 local UnitIsMercenary = UnitIsMercenary
 local UnitIsPlayer = UnitIsPlayer
 local UnitIsVisible = UnitIsVisible
 local UnitSex = UnitSex
+local UnitThreatSituation = UnitThreatSituation
 
 local WorldFrame = WorldFrame
 local GetWatchedFactionInfo = GetWatchedFactionInfo
 local GetWatchedFactionData = C_Reputation.GetWatchedFactionData
 
+local ShouldUnitIdentityBeSecret = C_Secrets and C_Secrets.ShouldUnitIdentityBeSecret
 local GetColorDataForItemQuality = ColorManager and ColorManager.GetColorDataForItemQuality
 local GetAuraDataByIndex = C_UnitAuras.GetAuraDataByIndex
-local UnpackAuraData = AuraUtil.UnpackAuraData
 
 local GetSpecialization = C_SpecializationInfo.GetSpecialization or GetSpecialization
 local GetSpecializationInfo = C_SpecializationInfo.GetSpecializationInfo or GetSpecializationInfo
@@ -108,7 +110,7 @@ E.ThreatPets = {
 
 E.SpecByClass = {
 	DEATHKNIGHT	= { 250, 251, 252 },
-	DEMONHUNTER	= { 577, 581 },
+	DEMONHUNTER	= { 577, 581, 1480 },
 	DRUID		= { 102, 103, 104, 105 },
 	EVOKER		= { 1467, 1468, 1473},
 	HUNTER		= { 253, 254, 255 },
@@ -146,6 +148,7 @@ E.SpecName = { -- english locale
 	-- Demon Hunter
 	[577]	= 'Havoc',
 	[581]	= 'Vengeance',
+	[1480]	= 'Devourer',
 	-- Druids
 	[102]	= 'Balance',
 	[103]	= 'Feral',
@@ -196,7 +199,7 @@ E.SpecName = { -- english locale
 -- the secure header is different on retail because of evokers
 -- if both are registered on non-retail, it will fire on down and up
 function E:RegisterClicks(frame)
-	if E.Retail then
+	if E.Retail or E.TBC then
 		frame:RegisterForClicks('AnyDown', 'AnyUp')
 	else
 		frame:RegisterForClicks('AnyUp')
@@ -518,7 +521,10 @@ end
 
 do
 	function E:GetAuraData(unitToken, index, filter)
-		return UnpackAuraData(GetAuraDataByIndex(unitToken, index, filter))
+		local data = GetAuraDataByIndex(unitToken, index, filter)
+		if not data then return end
+
+		return ElvUF:UnpackAuraData(data)
 	end
 
 	local function FindAura(key, value, unit, index, filter, ...)
@@ -1036,7 +1042,7 @@ function E:PositionGameMenuButton()
 
 			local lastIndex = gameMenuLastButtons[text]
 			if lastIndex == gameMenuLastButtons.ElvUI and GameMenuFrame.ElvUI then
-				GameMenuFrame.ElvUI:Point('TOPLEFT', button, 'BOTTOMLEFT', 0, -10)
+				GameMenuFrame.ElvUI:Point('TOPLEFT', button, 'BOTTOMLEFT', 0, E.TBC and -10 or -46)
 			elseif not lastIndex then
 				button:NudgePoint(nil, -offset)
 			end
@@ -1094,7 +1100,9 @@ function E:SetupGameMenu()
 		GameMenuFrame.ElvUI = button
 		GameMenuFrame.MenuButtons = {}
 
-		E:ScaleGameMenu()
+		if E.Retail then
+			E:ScaleGameMenu()
+		end
 
 		hooksecurefunc(GameMenuFrame, 'Layout', E.PositionGameMenuButton)
 	else
@@ -1281,8 +1289,37 @@ function E:GROUP_LEFT()
 	wipe(E.GroupRoles)
 end
 
-function E:UnitExists(unit) -- oUF way
+function E:UnitExists(unit)
+	if ShouldUnitIdentityBeSecret and ShouldUnitIdentityBeSecret(unit) then return end
+
 	return unit and (UnitExists(unit) or UnitIsVisible(unit))
+end
+
+function E:UnitEffectiveLevel(unit)
+	if E.Retail or E.Mists or E.Wrath or E.TBC then
+		return _G.UnitEffectiveLevel(unit)
+	else
+		return _G.UnitLevel(unit)
+	end
+end
+
+function E:GetClassificationColor(unit)
+	if UnitIsPlayer(unit) then return end
+
+	local classification = UnitClassification(unit)
+	local unitLevel = E:UnitEffectiveLevel(unit)
+	local maxLevel = E.expansionLevel
+
+	if classification == 'worldboss' or classification == 'rareelite' or classification == 'rare' then
+		return classification
+	elseif (classification == 'elite') and (unitLevel >= (maxLevel + 2)) then
+		return 'eliteBoss'
+	elseif (classification == 'elite') and (unitLevel >= (maxLevel + 1)) then
+		return 'eliteMini'
+	else
+		local baseClass = UnitClassBase(unit)
+		return (baseClass == 'PALADIN' and 'caster') or 'melee'
+	end
 end
 
 function E:LoadAPI()

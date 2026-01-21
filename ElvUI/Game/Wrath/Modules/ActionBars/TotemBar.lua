@@ -58,12 +58,16 @@ function AB:MultiCastActionButton_Update(button)
 end
 
 function AB:MultiCastSummonSpellButton_Update(summonButton)
-	local buttonSpacing = AB.db.totemBar.spacing
-
-	-- reposition the first slot to the summon button
-	local slot1 = _G.MultiCastSlotButton1
-	slot1:ClearAllPoints()
-	slot1:Point('LEFT', summonButton, 'RIGHT', buttonSpacing, 0)
+	if InCombatLockdown() then
+		AB.NeedsMultiCastButtonUpdate = summonButton
+		AB:RegisterEvent('PLAYER_REGEN_ENABLED')
+	else
+		-- reposition the first slot to the summon button
+		local buttonSpacing = AB.db.totemBar.spacing
+		local slot1 = _G.MultiCastSlotButton1
+		slot1:ClearAllPoints()
+		slot1:Point('LEFT', summonButton, 'RIGHT', buttonSpacing, 0)
+	end
 end
 
 function AB:StyleTotemSlotButton(button, slot)
@@ -77,7 +81,7 @@ function AB:StyleTotemSlotButton(button, slot)
 end
 
 function AB:SkinMultiCastButton(button, noBackdrop, useMasque)
-	if button.isSkinned then return end
+	if button.IsSkinned then return end
 
 	local name = button:GetName()
 	local highlight = _G[name..'Highlight']
@@ -114,7 +118,7 @@ function AB:SkinMultiCastButton(button, noBackdrop, useMasque)
 
 	AB.handledbuttons[button] = true
 	bar.buttons[button] = true
-	button.isSkinned = true
+	button.IsSkinned = true
 end
 
 function AB:MultiCastFlyoutFrame_ToggleFlyout(frame, which, parent)
@@ -130,7 +134,7 @@ function AB:MultiCastFlyoutFrame_ToggleFlyout(frame, which, parent)
 	local buttonSpacing = AB.db.totemBar.flyoutSpacing
 
 	for i, button in ipairs(frame.buttons) do
-		if not button.isSkinned then
+		if not button.IsSkinned then
 			AB:SkinMultiCastButton(button, nil, useMasque)
 
 			-- these only need mouseover script, dont need the bind key script

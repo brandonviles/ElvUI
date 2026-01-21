@@ -2,8 +2,9 @@ local E, L, V, P, G = unpack(ElvUI)
 local AB = E:GetModule('ActionBars')
 
 local _G = _G
-local ipairs, pairs, strmatch, next, unpack, tonumber = ipairs, pairs, strmatch, next, unpack, tonumber
-local format, gsub, strsplit, strfind, strsub, strupper = format, gsub, strsplit, strfind, strsub, strupper
+local format, unpack, tonumber = format, unpack, tonumber
+local next, type, pairs, ipairs, gsub = next, type, pairs, ipairs, gsub
+local strmatch, strsplit, strfind, strsub, strupper = strmatch, strsplit, strfind, strsub, strupper
 
 local ClearOnBarHighlightMarks = ClearOnBarHighlightMarks
 local ClearOverrideBindings = ClearOverrideBindings
@@ -47,6 +48,7 @@ local COOLDOWN_TYPE_LOSS_OF_CONTROL = COOLDOWN_TYPE_LOSS_OF_CONTROL
 local CLICK_BINDING_NOT_AVAILABLE = CLICK_BINDING_NOT_AVAILABLE
 local BINDING_SET = Enum.BindingSet
 
+local IsHouseEditorActive = C_HouseEditor and C_HouseEditor.IsHouseEditorActive
 local GetNextCastSpell = C_AssistedCombat and C_AssistedCombat.GetNextCastSpell
 local GetSpellBookItemInfo = C_SpellBook.GetSpellBookItemInfo or GetSpellBookItemInfo
 local ClearPetActionHighlightMarks = ClearPetActionHighlightMarks or PetActionBar.ClearPetActionHighlightMarks
@@ -388,9 +390,6 @@ function AB:CreateBar(id)
 	for i = 1, 12 do
 		local button = LAB:CreateButton(i, format('%sButton%d', barName, i), bar)
 
-		button.AuraCooldown.targetAura = true
-		E:RegisterCooldown(button.AuraCooldown, 'actionbar')
-
 		if E.Retail then
 			button.ProfessionQualityOverlayFrame = CreateFrame('Frame', nil, button, 'ActionButtonTextureOverlayTemplate')
 		end
@@ -486,6 +485,11 @@ function AB:PLAYER_REGEN_ENABLED()
 			AB:MultiCastRecallSpellButton_Update()
 			AB.NeedsRecallButtonUpdate = nil
 		end
+
+		if AB.NeedsMultiCastButtonUpdate then
+			AB:MultiCastSummonSpellButton_Update(AB.NeedsMultiCastButtonUpdate)
+			AB.NeedsMultiCastButtonUpdate = nil
+		end
 	end
 
 	AB:UnregisterEvent('PLAYER_REGEN_ENABLED')
@@ -549,49 +553,59 @@ function AB:UpdateVehicleLeave()
 	end
 end
 
-function AB:ReassignBindings(event)
-	if event == 'UPDATE_BINDINGS' then
-		AB:UpdatePetBindings()
-		AB:UpdateStanceBindings()
-
-		if E.Retail then
-			AB:UpdateExtraBindings()
-		elseif E.Wrath and E.myclass == 'SHAMAN' then
-			AB:UpdateTotemBindings()
-		end
-	end
-
-	AB:UnregisterEvent('PLAYER_REGEN_DISABLED')
-
-	if InCombatLockdown() then return end
-
-	for _, bar in pairs(AB.handledBars) do
-		if bar then
-			ClearOverrideBindings(bar)
-
-			for _, button in ipairs(bar.buttons) do
-				if button.keyBoundTarget then
-					for _, key in next, { GetBindingKey(button.keyBoundTarget) } do
-						if key ~= '' then
-							SetOverrideBindingClick(bar, false, key, button:GetName())
-						end
-					end
+function AB:OverrideBinds(bar)
+	for _, button in ipairs(bar.buttons) do
+		if button.keyBoundTarget then
+			for _, key in next, { GetBindingKey(button.keyBoundTarget) } do
+				if key ~= '' then
+					SetOverrideBindingClick(bar, false, key, button:GetName())
 				end
 			end
 		end
 	end
 end
 
-function AB:RemoveBindings()
-	if InCombatLockdown() then return end
+function AB:UpdateBinds(event, func)
+	if InCombatLockdown() then
+		AB:RegisterEvent('PLAYER_REGEN_DISABLED', 'HandleBinds')
+
+		return
+	end
 
 	for _, bar in pairs(AB.handledBars) do
 		if bar then
 			ClearOverrideBindings(bar)
+
+			if func and type(func) == 'function' then
+				func(AB, bar)
+			end
 		end
 	end
+end
 
-	AB:RegisterEvent('PLAYER_REGEN_DISABLED', 'ReassignBindings')
+function AB:UpdateAllBinds(event)
+	AB:UpdatePetBindings()
+	AB:UpdateStanceBindings()
+
+	if E.Retail then
+		AB:UpdateExtraBindings()
+	elseif E.Wrath and E.myclass == 'SHAMAN' then
+		AB:UpdateTotemBindings()
+	end
+
+	AB:HandleBinds(event)
+end
+
+function AB:HandleBinds(event)
+	if event == 'PLAYER_REGEN_DISABLED' then
+		AB:UnregisterEvent('PLAYER_REGEN_DISABLED')
+	end
+
+	if event == 'HOUSE_EDITOR_MODE_CHANGED' then
+		AB:UpdateBinds(event, not IsHouseEditorActive() and AB.OverrideBinds or nil)
+	else
+		AB:UpdateBinds(event, AB.OverrideBinds)
+	end
 end
 
 do
@@ -754,6 +768,7 @@ function AB:StyleButton(button, noBackdrop, useMasque, ignoreNormal)
 
 	if not AB.handledbuttons[button] then
 		E:RegisterCooldown(button.cooldown, 'actionbar')
+
 		AB.handledbuttons[button] = true
 	end
 
@@ -915,7 +930,7 @@ do
 
 		if (E.Retail and (canGlide or CanGlide() or IsPossessBarVisible() or HasOverrideActionBar()))
 		or UnitCastingInfo('player') or UnitChannelInfo('player') or UnitExists('target') or UnitExists('focus')
-		or UnitExists('vehicle') or UnitAffectingCombat('player') or (UnitHealth('player') ~= UnitHealthMax('player')) then
+		or UnitExists('vehicle') or UnitAffectingCombat('player') or (not E.Midnight and (UnitHealth('player') ~= UnitHealthMax('player'))) then
 			self.mouseLock = true
 			E:UIFrameFadeIn(self, 0.2, self:GetAlpha(), 1)
 			AB:FadeBlings(1)
@@ -1141,9 +1156,9 @@ do
 		MainMenuBar = true,
 		BagsBar = E.TBC or nil,
 		MainActionBar = (E.TBC or E.Retail or E.Midnight) or nil,
-		[E.Retail and 'StanceBar' or 'StanceBarFrame'] = true,
-		[E.Retail and 'PetActionBar' or 'PetActionBarFrame'] = true,
-		[E.Retail and 'PossessActionBar' or 'PossessBarFrame'] = true
+		[(E.TBC or E.Retail) and 'StanceBar' or 'StanceBarFrame'] = true,
+		[(E.TBC or E.Retail) and 'PetActionBar' or 'PetActionBarFrame'] = true,
+		[(E.TBC or E.Retail) and 'PossessActionBar' or 'PossessBarFrame'] = true
 	}
 
 	local untaintButtons = {
@@ -1216,7 +1231,7 @@ do
 				frame:SetParent(E.HiddenFrame)
 				frame:UnregisterAllEvents()
 
-				if not E.Retail then
+				if not (E.Retail or E.TBC) then
 					AB:SetNoopsi(frame)
 				elseif name == 'PetActionBar' then -- EditMode messes with it, be specific otherwise bags taint
 					frame.UpdateVisibility = E.noop
@@ -1298,34 +1313,6 @@ do
 	end
 end
 
-function AB:ToggleCountDownNumbers(bar, button, cd)
-	if cd then -- ref: E:CreateCooldownTimer
-		local b = cd.GetParent and cd:GetParent()
-		if cd.timer and (b and b.config) then
-			-- update the new cooldown timer button config with the new setting
-			b.config.disableCountDownNumbers = not not E:ToggleBlizzardCooldownText(cd, cd.timer, true)
-		end
-	elseif button then -- ref: AB:UpdateButtonConfig
-		if button.cooldown and button.cooldown.timer and (bar and bar.buttonConfig) then
-			-- button.config will get updated from `button:UpdateConfig` in `AB:UpdateButtonConfig`
-			bar.buttonConfig.disableCountDownNumbers = not not E:ToggleBlizzardCooldownText(button.cooldown, button.cooldown.timer, true)
-		end
-	elseif bar then -- ref: E:UpdateCooldownOverride
-		if bar.buttons then
-			for _, btn in ipairs(bar.buttons) do
-				if btn and btn.config and (btn.cooldown and btn.cooldown.timer) then
-					-- update the buttons config
-					btn.config.disableCountDownNumbers = not not E:ToggleBlizzardCooldownText(btn.cooldown, btn.cooldown.timer, true)
-				end
-			end
-			if bar.buttonConfig then
-				-- we can actually clear this variable because it wont get used when this code runs
-				bar.buttonConfig.disableCountDownNumbers = nil
-			end
-		end
-	end
-end
-
 function AB:GetTextJustify(anchor)
 	return (anchor == 'TOPLEFT' or anchor == 'BOTTOMLEFT') and 'LEFT' or (anchor == 'TOP' or anchor == 'BOTTOM') and 'CENTER' or 'RIGHT'
 end
@@ -1347,7 +1334,7 @@ end
 
 do
 	local fixBars = {}
-	if E.Wrath or E.Mists then
+	if not E.Retail then -- retail has these bars as a fallback
 		fixBars.MULTIACTIONBAR5BUTTON = 'ELVUIBAR13BUTTON'
 		fixBars.MULTIACTIONBAR6BUTTON = 'ELVUIBAR14BUTTON'
 		fixBars.MULTIACTIONBAR7BUTTON = 'ELVUIBAR15BUTTON'
@@ -1431,6 +1418,9 @@ function AB:UpdateButtonConfig(barName, buttonName)
 	config.useDrawBling = not AB.db.hideCooldownBling
 	config.useDrawSwipeOnCharges = AB.db.useDrawSwipeOnCharges
 	config.handleOverlay = AB.db.handleOverlay
+
+	-- NOTE: Pick Up Action Key will break macros of the same key (secure action code)
+	--- it happens because `useOnKeyDown` is temporarily set to `false` while using the pickup key inside of LibActionButton
 	SetModifiedClick('PICKUPACTION', AB.db.movementModifier)
 
 	if not buttonName then
@@ -1438,8 +1428,6 @@ function AB:UpdateButtonConfig(barName, buttonName)
 	end
 
 	for i, button in ipairs(bar.buttons) do
-		AB:ToggleCountDownNumbers(bar, button)
-
 		local keyTarget = AB:GetKeyTarget(buttonName, i)
 		config.keyBoundTarget = keyTarget -- for LAB
 		button.keyBoundTarget = keyTarget -- for bind mode
@@ -1663,46 +1651,11 @@ function AB:StyleFlyout(button, arrow)
 	end
 end
 
-function AB:UpdateAuraCooldown(button, duration)
-	local cd = button and button.AuraCooldown
-	if not cd then return end
-
-	local oldstate = cd.hideText
-	cd.hideText = (not E.db.cooldown.targetAura) or (button.chargeCooldown and not button.chargeCooldown.hideText) or (button.cooldown and button.cooldown.currentCooldownType == COOLDOWN_TYPE_LOSS_OF_CONTROL) or (duration and duration > 1.5) or nil
-	if cd.timer and (oldstate ~= cd.hideText) then
-		E:ToggleBlizzardCooldownText(cd, cd.timer)
-		E:Cooldown_TimerUpdate(cd.timer)
-	end
-end
-
-function AB:UpdateChargeCooldown(button, duration)
-	local cd = button and button.chargeCooldown
-	if not cd then return end
-
-	local oldstate = cd.hideText
-	cd.hideText = (not AB.db.chargeCooldown) or (duration and duration > 1.5) or nil
-	if cd.timer and (oldstate ~= cd.hideText) then
-		E:ToggleBlizzardCooldownText(cd, cd.timer)
-		E:Cooldown_TimerUpdate(cd.timer)
-	end
-end
-
-function AB:SetTargetAuraDuration(value)
-	LAB:SetTargetAuraDuration(value)
-end
-
-function AB:SetTargetAuraCooldowns(enabled)
-	local enable, reverse = E.db.cooldown.enable, E.db.actionbar.cooldown.reverse
-	LAB:SetTargetAuraCooldowns(enabled and (enable and not reverse) or (not enable and reverse))
-end
-
 function AB:ToggleCooldownOptions()
 	for button in pairs(LAB.actionButtons) do
 		if button._state_type == 'action' then
 			local _, duration = button:GetCooldown()
 			AB:SetButtonDesaturation(button, duration)
-			AB:UpdateChargeCooldown(button, duration)
-			AB:UpdateAuraCooldown(button, duration)
 		end
 	end
 end
@@ -1776,17 +1729,11 @@ end
 
 function AB:LAB_CooldownDone(button)
 	AB:SetButtonDesaturation(button, 0)
-
-	if button._state_type == 'action' then
-		AB:UpdateAuraCooldown(button)
-	end
 end
 
 function AB:LAB_CooldownUpdate(button, _, duration)
 	if button._state_type == 'action' then
-		AB:SetButtonDesaturation(button, duration)
-		AB:UpdateChargeCooldown(button, duration)
-		AB:UpdateAuraCooldown(button, duration)
+		AB:SetButtonDesaturation(button, E:NotSecretValue(duration) and duration or nil)
 	end
 
 	if button.cooldown then
@@ -1901,8 +1848,8 @@ function AB:Initialize()
 		AB.fadeParent:RegisterUnitEvent('UNIT_ENTERED_VEHICLE', 'player')
 		AB.fadeParent:RegisterUnitEvent('UNIT_EXITED_VEHICLE', 'player')
 
-		AB:RegisterEvent('PET_BATTLE_CLOSE', 'ReassignBindings')
-		AB:RegisterEvent('PET_BATTLE_OPENING_DONE', 'RemoveBindings')
+		AB:RegisterEvent('PET_BATTLE_CLOSE', 'HandleBinds') -- set override binds
+		AB:RegisterEvent('PET_BATTLE_OPENING_DONE', 'UpdateBinds') -- no function passed, clears bindings
 	end
 
 	AB.fadeParent:SetScript('OnEvent', AB.FadeParent_OnEvent)
@@ -1928,10 +1875,8 @@ function AB:Initialize()
 
 	AB:RegisterEvent('ADDON_LOADED')
 	AB:RegisterEvent('PLAYER_ENTERING_WORLD')
-	AB:RegisterEvent('UPDATE_BINDINGS', 'ReassignBindings')
+	AB:RegisterEvent('UPDATE_BINDINGS', 'UpdateAllBinds')
 	AB:RegisterEvent('SPELL_UPDATE_COOLDOWN', 'UpdateSpellBookTooltip')
-
-	AB:SetTargetAuraDuration(E.db.cooldown.targetAuraDuration)
 
 	if _G.MacroFrame then
 		AB:ADDON_LOADED(nil, 'Blizzard_MacroUI')
@@ -1945,10 +1890,11 @@ function AB:Initialize()
 		AB:CreateTotemBar()
 	end
 
+	-- handle the first set of bindings unless in a pet battle
 	if (E.Retail or E.Mists) and IsInBattle() then
-		AB:RemoveBindings()
+		AB:UpdateBinds() -- no function passed, clears bindings
 	else
-		AB:ReassignBindings()
+		AB:HandleBinds() -- set override binds
 	end
 
 	-- We handle actionbar lock for regular bars, but the lock on PetBar needs to be handled by WoW so make some necessary updates
@@ -1956,6 +1902,8 @@ function AB:Initialize()
 	_G.LOCK_ACTIONBAR = (AB.db.lockActionBars and '1' or '0') -- Keep an eye on this, in case it taints
 
 	if E.Retail then
+		AB:RegisterEvent('HOUSE_EDITOR_MODE_CHANGED', 'HandleBinds')
+
 		hooksecurefunc(_G.SpellFlyout, 'Show', AB.UpdateFlyoutButtons)
 		hooksecurefunc(_G.SpellFlyout, 'Hide', AB.UpdateFlyoutButtons)
 

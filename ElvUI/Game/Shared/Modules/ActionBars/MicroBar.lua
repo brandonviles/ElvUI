@@ -46,7 +46,8 @@ do
 		CollectionsMicroButton	= 8.00 / meep,
 		MainMenuMicroButton		= (E.Classic and 10 or 9) / meep, -- flip these
 		HelpMicroButton			= (E.Classic and 9 or 10) / meep, -- on classic
-		StoreMicroButton		= 10.0 / meep
+		StoreMicroButton		= 10.0 / meep,
+		HousingMicroButton		= 11.0 / meep
 	}
 end
 
@@ -196,7 +197,7 @@ function AB:HandleMicroTextures(button, name)
 			if stock and stock.disabled then
 				disabled:SetTexture(stock.disabled)
 			else
-				disabled:SetTexture(texture)
+				disabled:SetTexture(texture or nil)
 			end
 
 			disabled:SetDesaturated(true)
@@ -442,7 +443,7 @@ function AB:SetupMicroBar()
 		local button = _G[name]
 		AB:HandleMicroButton(button, name)
 
-		if E.Retail or name == 'MainMenuMicroButton' then
+		if E.Retail or (name == 'MainMenuMicroButton' or name == 'GuildMicroButton') then
 			hooksecurefunc(button, (E.Retail and 'SetHighlightAtlas') or (E.Classic and 'SetPushedTexture') or 'SetHighlightTexture', function()
 				AB:UpdateMicroButtonTexture(name)
 			end)

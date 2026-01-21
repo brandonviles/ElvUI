@@ -155,9 +155,7 @@ function S:CooldownManager_UpdateSwipeColor(frame)
 end
 
 function S:CooldownManager_SetTimerShown()
-	if self.Cooldown then
-		E:ToggleBlizzardCooldownText(self.Cooldown, self.Cooldown.timer)
-	end
+
 end
 
 function S:CooldownManager_RefreshOverlayGlow()
@@ -298,6 +296,7 @@ function S:Blizzard_CooldownViewer()
 		S:HandleEditBox(CooldownViewer.SearchBox)
 		S:HandleTrimScrollBar(CooldownViewer.CooldownScroll.ScrollBar)
 		S:HandleButton(CooldownViewer.UndoButton)
+		S:HandleDropDownBox(CooldownViewer.LayoutDropdown)
 
 		for i, tab in next, { CooldownViewer.SpellsTab, CooldownViewer.AurasTab } do
 			tab:CreateBackdrop()

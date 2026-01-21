@@ -1,7 +1,7 @@
 local E, L, V, P, G = unpack(ElvUI)
 local DT = E:GetModule('DataTexts')
 
-if not (E.Wrath or E.Mists or E.ClassicSOD or E.ClassicAnniv or E.ClassicAnnivHC) then return end
+if not (E.Wrath or E.TBC or E.ClassicSOD or E.ClassicAnniv or E.ClassicAnnivHC) then return end
 
 local _G = _G
 local format, strjoin = format, strjoin
@@ -10,27 +10,28 @@ local IsShiftKeyDown = IsShiftKeyDown
 local ShowUIPanel = ShowUIPanel
 
 local LEVEL_UP_DUALSPEC = LEVEL_UP_DUALSPEC
-local MAX_TALENT_TABS = MAX_TALENT_TABS
 local PRIMARY = PRIMARY
 local SECONDARY = SECONDARY
 
-local GetActiveTalentGroup = GetActiveTalentGroup
-local GetNumTalentGroups = GetNumTalentGroups
-local SetActiveTalentGroup = SetActiveTalentGroup
 local GetTalentTabInfo = GetTalentTabInfo
+local GetNumTalentGroups = GetNumTalentGroups
+local GetActiveTalentGroup = GetActiveTalentGroup
+local SetActiveTalentGroup = SetActiveTalentGroup
 
 local LoadAddOn = C_AddOns.LoadAddOn
 
 local displayString, db = ''
 local primaryStr, secondaryStr, activeGroup, hasDualSpec = '', ''
 
-local function BuildTalentString(talentGroup)
+local function BuildTalentString(group)
 	local str = ''
 
-	for i = 1, MAX_TALENT_TABS do
-		local _, _, arg3, _, arg5 = GetTalentTabInfo(i, false, false, talentGroup)
-		local points = ((E.Wrath or E.Mists) and arg5) or arg3
-		str = (str == '' and points) or strjoin('/', str, points)
+	for i = 1, _G.MAX_TALENT_TABS do
+		local _, _, arg3, _, arg5 = GetTalentTabInfo(i, false, false, group)
+		local points = (E.Wrath and arg5) or arg3
+		if points then
+			str = (str == '' and points) or strjoin('/', str, points)
+		end
 	end
 
 	return str
@@ -79,7 +80,7 @@ local function OnClick(_, button)
 			else
 				HideUIPanel(_G.PlayerTalentFrame)
 			end
-		elseif hasDualSpec then
+		elseif hasDualSpec and SetActiveTalentGroup then
 			SetActiveTalentGroup(activeGroup == 1 and 2 or 1)
 		end
 	end
